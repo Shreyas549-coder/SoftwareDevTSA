@@ -56,7 +56,7 @@ MODES = {
     "Eye Saver": {"color": "#ffcc80", "alpha": 0.3},
 }
 
-# digits for test
+# digits for test (Ishihara-style)
 NUMBERS = {
     "0": ["01110","10001","10011","10101","11001","10001","01110"],
     "1": ["00100","01100","00100","00100","00100","00100","01110"],
@@ -70,7 +70,7 @@ NUMBERS = {
     "9": ["01110","10001","10001","01111","00001","00001","01110"],
 }
 
-# draw test plate
+# draw plate
 def draw_plate(canvas, number, fg, bg):
     canvas.delete("all")
     for _ in range(1200):
@@ -95,7 +95,7 @@ def draw_plate(canvas, number, fg, bg):
                         fill=fg, outline=fg
                     )
 
-# pick overlay color based on test results
+# overlay decision
 def get_overlay_color(rg, by):
     if rg and by:
         hue = 0.58
@@ -108,42 +108,88 @@ def get_overlay_color(rg, by):
     r, g, b = colorsys.hsv_to_rgb(hue, 0.75, 0.85)
     return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
 
-# main app
 class App:
     def __init__(self):
         self.win = tk.Tk()
         self.win.title("Color Assist")
-        self.win.geometry("400x550")
-        self.win.configure(bg="#222222")
+        self.win.geometry("460x700")  # bigger window
+        self.win.minsize(460, 700)
+        self.win.configure(bg="#1e1e1e")
 
-        tk.Label(self.win, text="Select Mode:", font=("Segoe UI", 14), fg="white", bg="#222222").pack(pady=8)
+        BG = "#1e1e1e"
+        CARD = "#2a2a2a"
+        BTN = "#3a3a3a"
+        BTN_HOVER = "#505050"
+        TEXT = "#ffffff"
+        SUBTEXT = "#aaaaaa"
+        ACCENT = "#4da6ff"
+
+        def make_button(parent, text, cmd, color=BTN):
+            btn = tk.Button(
+                parent, text=text, font=("Segoe UI", 11),
+                bg=color, fg=TEXT, relief="flat",
+                activebackground=BTN_HOVER,
+                command=cmd, padx=10, pady=8
+            )
+            btn.bind("<Enter>", lambda e: btn.config(bg=BTN_HOVER))
+            btn.bind("<Leave>", lambda e: btn.config(bg=color))
+            return btn
+
+        # Title
+        tk.Label(self.win, text="Color Assist",
+                 font=("Segoe UI", 20, "bold"),
+                 fg=TEXT, bg=BG).pack(pady=(15, 5))
+
+        tk.Label(self.win, text="Accessibility overlay + Ishihara-style test",
+                 font=("Segoe UI", 10),
+                 fg=SUBTEXT, bg=BG).pack(pady=(0, 10))
+
+        # Status
+        self.status = tk.Label(self.win, text="No Overlay Active",
+                               fg=SUBTEXT, bg=BG)
+        self.status.pack(pady=5)
+
+        # Modes
+        frame = tk.Frame(self.win, bg=CARD)
+        frame.pack(padx=15, pady=10, fill="x")
+
+        tk.Label(frame, text="Overlay Modes",
+                 font=("Segoe UI", 13, "bold"),
+                 fg=TEXT, bg=CARD).pack(anchor="w", padx=10, pady=5)
 
         for mode in MODES:
-            tk.Button(
-                self.win, text=mode, font=("Segoe UI", 12), width=20,
-                bg="#444444", fg="white", relief="flat",
-                command=lambda m=mode: self.start_overlay(m)
-            ).pack(pady=5)
+            make_button(frame, mode,
+                        lambda m=mode: self.start_overlay(m)
+                        ).pack(fill="x", padx=10, pady=4)
 
-        tk.Button(
-            self.win, text="Disable Overlay", font=("Segoe UI", 12), width=20,
-            bg="#555555", fg="white", relief="flat", command=self.disable_overlay
-        ).pack(pady=10)
+        # Controls
+        frame2 = tk.Frame(self.win, bg=CARD)
+        frame2.pack(padx=15, pady=10, fill="x")
 
-        tk.Button(
-            self.win, text="Color Vision Test", font=("Segoe UI", 12), width=25,
-            bg="#3366aa", fg="white", relief="flat", command=self.open_test
-        ).pack(pady=6)
+        tk.Label(frame2, text="Controls",
+                 font=("Segoe UI", 13, "bold"),
+                 fg=TEXT, bg=CARD).pack(anchor="w", padx=10, pady=5)
 
-        tk.Button(
-            self.win, text="Quit", font=("Segoe UI", 12), width=20,
-            bg="#aa3333", fg="white", relief="flat", command=self.quit
-        ).pack(pady=5)
+        make_button(frame2, "Disable Overlay",
+                    self.disable_overlay, "#555").pack(fill="x", padx=10, pady=4)
 
-        tk.Label(
-            self.win, text="Ctrl+Shift+O to toggle overlay", font=("Segoe UI", 10),
-            fg="gray", bg="#222222"
-        ).pack(side="bottom", pady=15)
+        make_button(frame2, "Quit",
+                    self.quit, "#aa3333").pack(fill="x", padx=10, pady=4)
+
+        # Tools (TEST clearly visible now)
+        frame3 = tk.Frame(self.win, bg=CARD)
+        frame3.pack(padx=15, pady=10, fill="x")
+
+        tk.Label(frame3, text="Vision Test (Ishihara Style)",
+                 font=("Segoe UI", 13, "bold"),
+                 fg=TEXT, bg=CARD).pack(anchor="w", padx=10, pady=5)
+
+        make_button(frame3, "Start Test",
+                    self.open_test, ACCENT).pack(fill="x", padx=10, pady=10)
+
+        # Footer
+        tk.Label(self.win, text="Hotkey: Ctrl + Shift + O",
+                 fg=SUBTEXT, bg=BG).pack(side="bottom", pady=10)
 
         self.overlay = None
         self.win.protocol("WM_DELETE_WINDOW", self.quit)
@@ -154,11 +200,13 @@ class App:
         self.disable_overlay()
         data = MODES[mode]
         self.overlay = Overlay(data["color"], data["alpha"])
+        self.status.config(text=f"Active: {mode}")
 
     def disable_overlay(self):
         if self.overlay:
             self.overlay.close()
             self.overlay = None
+        self.status.config(text="No Overlay Active")
 
     def hotkey_listener(self):
         while True:
@@ -171,26 +219,31 @@ class App:
         self.win.destroy()
         sys.exit()
 
-    # test
+    # TEST WINDOW (unchanged logic, just clearer UI)
     def open_test(self):
         self.test_win = tk.Toplevel(self.win)
         self.test_win.title("Color Vision Test")
-        self.test_win.geometry("360x540")
-        self.test_win.configure(bg="#222")
+        self.test_win.geometry("400x600")
+        self.test_win.configure(bg="#1e1e1e")
 
-        tk.Label(
-            self.test_win,
-            text="Type number you see\nLeave blank if none",
-            fg="white", bg="#222", justify="center"
-        ).pack(pady=10)
+        tk.Label(self.test_win,
+                 text="Enter the number you see",
+                 fg="white", bg="#1e1e1e").pack(pady=10)
 
-        self.canvas = tk.Canvas(self.test_win, width=320, height=320, bg="#222", highlightthickness=0)
+        self.canvas = tk.Canvas(self.test_win,
+                                width=320, height=320,
+                                bg="#1e1e1e", highlightthickness=0)
         self.canvas.pack()
 
-        self.entry = tk.Entry(self.test_win, font=("Segoe UI", 16), justify="center")
-        self.entry.pack(pady=8)
+        self.entry = tk.Entry(self.test_win,
+                              font=("Segoe UI", 16),
+                              justify="center")
+        self.entry.pack(pady=10)
 
-        tk.Button(self.test_win, text="Submit", bg="#33aa66", fg="white", command=self.submit_test).pack(pady=10)
+        tk.Button(self.test_win,
+                  text="Submit",
+                  bg="#33aa66", fg="white",
+                  command=self.submit_test).pack(pady=10)
 
         self.rg_plates = [random.choice(list(NUMBERS)) for _ in range(4)]
         self.by_plates = [random.choice(list(NUMBERS)) for _ in range(4)]
@@ -231,6 +284,7 @@ class App:
         if color:
             self.disable_overlay()
             self.overlay = Overlay(color, 0.28)
+            self.status.config(text="Active: Auto-detected")
 
 # run
 if __name__ == "__main__":
